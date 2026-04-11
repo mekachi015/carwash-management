@@ -43,7 +43,7 @@ export function CustomerStatus({ onNavigate }) {
             <div>
               <h2 style={{ margin: '0 0 0.25rem' }}>{car.name}</h2>
               <p style={{ color: 'var(--gray-500)', fontSize: '0.875rem' }}>
-                {car.plate ? `${car.plate} · ` : ''}{car.service === 'basic' ? 'Basic Wash' : 'Deluxe Wash'}
+                {car.plate ? `${car.plate} · ` : ''}{car.serviceType === 'basic' ? 'Basic Wash' : 'Deluxe Wash'}
               </p>
             </div>
             <StatusBadge status={car.status} />
@@ -75,7 +75,7 @@ export function CustomerStatus({ onNavigate }) {
           <hr className="divider" />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--gray-500)' }}>
-              Amount: <strong>${SERVICE_PRICES[car.service]}</strong> ·{' '}
+              Amount: <strong>${SERVICE_PRICES[car.serviceType]}</strong> ·{' '}
               {car.paid
                 ? <span className="tag-paid">Paid</span>
                 : <span className="tag-unpaid">Unpaid</span>}
