@@ -1,16 +1,18 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';   // <-- ADD THIS
 import { getCarById, markCarPaid } from '../api/cars';
 import { useQueueContext } from '../context/QueueContext';
 import { fmtCardNumber, fmtExpiry } from '../utils/formatters';
 import { SERVICE_PRICES } from '../utils/constants';
 
-export function Payment({ onNavigate }) {
-  const { refresh }   = useQueueContext();
-  const id            = sessionStorage.getItem('pay_car');
-  const car           = id ? getCarById(id) : null;
+export function Payment() {   // <-- REMOVE onNavigate prop
+  const navigate = useNavigate();   // <-- ADD THIS
+  const { refresh } = useQueueContext();
+  const id = sessionStorage.getItem('pay_car');
+  const car = id ? getCarById(id) : null;
   const [success, setSuccess] = useState(false);
-  const [error, setError]     = useState('');
-  const [form, setForm]       = useState({ number: '', expiry: '', cvc: '', name: '' });
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({ number: '', expiry: '', cvc: '', name: '' });
 
   if (!car) {
     return (
@@ -19,7 +21,7 @@ export function Payment({ onNavigate }) {
         <div className="card" style={{ maxWidth: 480, marginTop: '1rem' }}>
           <p style={{ color: 'var(--gray-500)' }}>
             No car selected. Go to{' '}
-            <a href="#" onClick={e => { e.preventDefault(); onNavigate('status'); }} style={{ color: 'var(--blue)' }}>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate('/status'); }} style={{ color: 'var(--blue)' }}>
               Status
             </a>{' '}
             to find your car first.
@@ -39,7 +41,7 @@ export function Payment({ onNavigate }) {
           <p style={{ color: 'var(--gray-500)', margin: '0.5rem 0 1.5rem' }}>
             ${SERVICE_PRICES[car.service]} paid for {car.name}. Thank you!
           </p>
-          <button className="btn-primary" onClick={() => onNavigate('status')}>Back to Status</button>
+          <button className="btn-primary" onClick={() => navigate('/status')}>Back to Status</button>
         </div>
       </div>
     );

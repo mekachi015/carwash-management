@@ -38,9 +38,13 @@ function App() {
 
               {/* Individual car tracking page for customers */}
               <Route path="/status/:carId" element={<CustomerStatus />} />
+              {/* Optional route to handle missing carId */}
+              <Route path="/status" element={<CustomerStatus />} /> 
 
               {/* Payment processing page */}
-              <Route path="/pay/:carId" element={<Payment />} />
+              <Route path="/payment/:carId" element={<Payment />} />
+              {/* Optional route to handle missing carId */}
+              <Route path="/payment" element={<Payment />} />
             </Routes>
           </main>
         </div>

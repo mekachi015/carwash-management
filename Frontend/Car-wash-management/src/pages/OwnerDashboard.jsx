@@ -58,10 +58,10 @@ export function OwnerDashboard() {
       </div>
 
       <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
-        <StatsCard label="Revenue Today"  value={`$${revenue}`}               sub="paid cars"        />
-        <StatCard label="Cars Washed"    value={washed}                       sub="completed today"  />
-        <StatCard label="Avg Wait Time"  value={avgWait ? `${avgWait}m` : '—'} sub="arrival to done" />
-        <StatCard label="In Queue Now"   value={queueLength}                  sub="active"           />
+        <StatsCard label="Revenue Today"  value={`R${revenue}`}               sub="paid cars"        />
+        <StatsCard label="Cars Washed"    value={washed}                       sub="completed today"  />
+        <StatsCard label="Avg Wait Time"  value={avgWait ? `${avgWait}m` : '—'} sub="arrival to done" />
+        <StatsCard label="In Queue Now"   value={queueLength}                  sub="active"           />
       </div>
 
       <div className="card" style={{ marginBottom: '1rem' }}>

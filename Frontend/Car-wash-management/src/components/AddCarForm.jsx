@@ -43,13 +43,13 @@ export function AddCarForm() {
         <div className="form-row">
           <label>Service Type</label>
           <select value={form.service} onChange={e => update('service', e.target.value)}>
-            <option value="basic">Basic — $10</option>
-            <option value="deluxe">Deluxe — $20</option>
+            <option value="basic">Basic — R100</option>
+            <option value="deluxe">Deluxe — R200</option>
           </select>
         </div>
         <div className="form-row">
           <label>License Plate <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}>(optional)</span></label>
-          <input type="text" placeholder="e.g. ABC 123" value={form.plate} onChange={e => update('plate', e.target.value)} />
+          <input type="text" placeholder="e.g. ABC 123 L" value={form.plate} onChange={e => update('plate', e.target.value)} />
         </div>
       </div>
       <button className="btn-primary" style={{ marginTop: '0.5rem' }} onClick={handleSubmit}>
