@@ -1,27 +1,65 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';   // <-- ADD THIS
-import { getCarById, markCarPaid } from '../api/cars';
+import { getCarById, processPayment } from '../api/cars';
 import { useQueueContext } from '../context/QueueContext';
 import { fmtCardNumber, fmtExpiry } from '../utils/formatters';
-import { SERVICE_PRICES } from '../utils/constants';
 
-export function Payment() {   // <-- REMOVE onNavigate prop
-  const navigate = useNavigate();   // <-- ADD THIS
-  const { refresh } = useQueueContext();
-  const id = sessionStorage.getItem('pay_car');
-  const car = id ? getCarById(id) : null;
+const SERVICE_PRICES = { basic: 10, deluxe: 20 };
+
+export function Payment({ onNavigate }) {
+  const { refresh }       = useQueueContext();
+  const id                = sessionStorage.getItem('pay_car');
+  const [car, setCar]     = useState(null);
+  const [setLoaded] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
-  const [form, setForm] = useState({ number: '', expiry: '', cvc: '', name: '' });
+  const [error, setError]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const [form, setForm]     = useState({ number: '', expiry: '', cvc: '', name: '' });
 
-  if (!car) {
+  // Load the car once when the component mounts
+  useState(() => {
+    if (!id) return;
+    getCarById(id)
+      .then(c => { setCar(c); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, [id]);
+
+  function update(field, raw) {
+    let val = raw;
+    if (field === 'number') val = fmtCardNumber(raw);
+    if (field === 'expiry') val = fmtExpiry(raw);
+    setForm(f => ({ ...f, [field]: val }));
+  }
+
+  async function handlePay() {
+    const clean = form.number.replace(/\s/g, '');
+    if (clean.length < 12 || !form.expiry || form.cvc.length < 3) {
+      setError('Please fill in all card details correctly.');
+      return;
+    }
+
+    // Send only the last 4 digits to the backend
+    const cardLast4 = clean.slice(-4);
+    setLoading(true);
+    setError('');
+    try {
+      await processPayment(id, cardLast4);
+      await refresh();
+      setSuccess(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!id) {
     return (
       <div>
         <h1>Payment</h1>
         <div className="card" style={{ maxWidth: 480, marginTop: '1rem' }}>
           <p style={{ color: 'var(--gray-500)' }}>
             No car selected. Go to{' '}
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate('/status'); }} style={{ color: 'var(--blue)' }}>
+            <a href="#" onClick={e => { e.preventDefault(); onNavigate('status'); }} style={{ color: 'var(--blue)' }}>
               Status
             </a>{' '}
             to find your car first.
@@ -31,7 +69,7 @@ export function Payment() {   // <-- REMOVE onNavigate prop
     );
   }
 
-  if (car.paid || success) {
+  if (car?.paid || success) {
     return (
       <div>
         <h1>Payment</h1>
@@ -39,33 +77,15 @@ export function Payment() {   // <-- REMOVE onNavigate prop
           <div style={{ width: 64, height: 64, background: 'var(--green-light)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: '2rem' }}>✓</div>
           <h2 style={{ color: 'var(--green)' }}>Payment Successful</h2>
           <p style={{ color: 'var(--gray-500)', margin: '0.5rem 0 1.5rem' }}>
-            ${SERVICE_PRICES[car.service]} paid for {car.name}. Thank you!
+            ${SERVICE_PRICES[car?.serviceType]} paid for {car?.customerName}. Thank you!
           </p>
-          <button className="btn-primary" onClick={() => navigate('/status')}>Back to Status</button>
+          <button className="btn-primary" onClick={() => onNavigate(`status/${car?.id}`)}>Back to Status</button>
         </div>
       </div>
     );
   }
 
-  const amount = SERVICE_PRICES[car.service];
-
-  function handlePay() {
-    const clean = form.number.replace(/\s/g, '');
-    if (clean.length < 12 || !form.expiry || form.cvc.length < 3) {
-      setError('Please fill in all card details correctly.');
-      return;
-    }
-    markCarPaid(car.id);
-    refresh();
-    setSuccess(true);
-  }
-
-  function update(field, raw) {
-    let val = raw;
-    if (field === 'number') val = fmtCardNumber(raw);
-    if (field === 'expiry') val = fmtExpiry(raw);
-    setForm(f => ({ ...f, [field]: val }));
-  }
+  const amount = SERVICE_PRICES[car?.serviceType] ?? '...';
 
   return (
     <div>
@@ -73,9 +93,10 @@ export function Payment() {   // <-- REMOVE onNavigate prop
       <p style={{ color: 'var(--gray-500)', marginBottom: '1.5rem' }}>Secure simulated checkout.</p>
       <div className="card" style={{ maxWidth: 480 }}>
         <div style={{ marginBottom: '1.25rem' }}>
-          <h2>{car.name}</h2>
+          <h2>{car?.customerName ?? '...'}</h2>
           <p style={{ color: 'var(--gray-500)', fontSize: '0.875rem' }}>
-            {car.service === 'basic' ? 'Basic Wash' : 'Deluxe Wash'} {car.plate ? `· ${car.plate}` : ''}
+            {car?.serviceType === 'basic' ? 'Basic Wash' : 'Deluxe Wash'}
+            {car?.licensePlate ? ` · ${car.licensePlate}` : ''}
           </p>
         </div>
         <div className="stat" style={{ marginBottom: '1.25rem' }}>
@@ -98,12 +119,17 @@ export function Payment() {   // <-- REMOVE onNavigate prop
           </div>
           <div className="cc-full form-row">
             <label>Cardholder Name</label>
-            <input placeholder={car.name} value={form.name} onChange={e => update('name', e.target.value)} />
+            <input placeholder={car?.customerName ?? ''} value={form.name} onChange={e => update('name', e.target.value)} />
           </div>
         </div>
         {error && <div className="alert alert-error" style={{ marginBottom: '0.75rem' }}>{error}</div>}
-        <button className="btn-success btn-lg" style={{ width: '100%', marginTop: '0.5rem' }} onClick={handlePay}>
-          Pay ${amount} Now
+        <button
+          className="btn-success btn-lg"
+          style={{ width: '100%', marginTop: '0.5rem' }}
+          onClick={handlePay}
+          disabled={loading}
+        >
+          {loading ? 'Processing...' : `Pay $${amount} Now`}
         </button>
         <p style={{ fontSize: '0.75rem', color: 'var(--gray-400)', textAlign: 'center', marginTop: '0.75rem' }}>
           🔒 This is a simulated payment — no real charges

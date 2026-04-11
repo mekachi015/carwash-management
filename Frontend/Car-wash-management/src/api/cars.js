@@ -1,129 +1,128 @@
-import { uid } from '../utils/formatters';
-import { SERVICE_PRICES } from '../utils/constants';
+import { apiFetch } from './index';
 
-const KEY = 'cw_cars';
+// ── Queue (public page) ───────────────────────────────────────────────────────
 
-export function getAllCars() {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) || '[]');
-  } catch {
-    return [];
-  }
+/**
+ * GET /api/queue
+ * Returns { queue, totalWaiting, estimatedWaitMins, suggestedArrival, statusColor }
+ */
+export async function getQueue() {
+  return apiFetch('/api/queue');
 }
 
-export function saveCars(cars) {
-  localStorage.setItem(KEY, JSON.stringify(cars));
+// ── Cars (staff + status pages) ───────────────────────────────────────────────
+
+/**
+ * GET /api/cars
+ * Returns all cars — used by owner dashboard.
+ */
+export async function getAllCars() {
+  return apiFetch('/api/cars');
 }
 
-export function getQueue() {
-  return getAllCars()
-    .filter(c => c.status !== 'Done')
-    .sort((a, b) => a.arrivalTime - b.arrivalTime);
+/**
+ * GET /api/cars/{id}
+ */
+export async function getCarById(id) {
+  return apiFetch(`/api/cars/${id}`);
 }
 
-export function getTodayCars() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  return getAllCars().filter(c => c.arrivalTime >= start.getTime());
+/**
+ * GET /api/cars/by-phone/{phoneNumber}
+ * Used by the customer status page.
+ */
+export async function getCarByPhone(phone) {
+  return apiFetch(`/api/cars/by-phone/${encodeURIComponent(phone)}`);
 }
 
-export function getCarByPhone(phone) {
-  const clean = phone.replace(/\s/g, '');
-  return getAllCars().find(c => c.phone.replace(/\s/g, '') === clean) || null;
+/**
+ * POST /api/cars
+ * Body: { customerName, phoneNumber, serviceType, licensePlate }
+ * Returns the created Car.
+ */
+export async function addCar({ customerName, phoneNumber, serviceType, licensePlate = '' }) {
+  return apiFetch('/api/cars', {
+    method: 'POST',
+    body: JSON.stringify({ customerName, phoneNumber, serviceType, licensePlate }),
+  });
 }
 
-export function getCarById(id) {
-  return getAllCars().find(c => c.id === id) || null;
+/**
+ * PATCH /api/cars/{id}/status
+ * Body: { status } — must be one of: WAITING, WASHING, RINSING, DRYING, DONE
+ * Returns the updated Car.
+ */
+export async function updateCarStatus(id, status) {
+  return apiFetch(`/api/cars/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 }
 
-export function addCar({ name, phone, service, plate }) {
-  const cars = getAllCars();
-  const existing = cars.find(
-    c => c.phone.replace(/\s/g, '') === phone.replace(/\s/g, '') && c.status !== 'Done'
-  );
-  if (existing) throw new Error('A car with this phone number is already in the queue.');
-
-  const car = {
-    id: uid(),
-    name,
-    phone,
-    service,
-    plate: plate || '',
-    status: 'Waiting',
-    paid: false,
-    arrivalTime: Date.now(),
-    completionTime: null,
-  };
-  cars.push(car);
-  saveCars(cars);
-  return car;
+/**
+ * DELETE /api/cars/{id}
+ * Returns null (204 No Content).
+ */
+export async function deleteCar(id) {
+  return apiFetch(`/api/cars/${id}`, { method: 'DELETE' });
 }
 
-export function updateCarStatus(id, status) {
-  const cars = getAllCars();
-  const car = cars.find(c => c.id === id);
-  if (!car) throw new Error('Car not found.');
-  car.status = status;
-  if (status === 'Done' && !car.completionTime) car.completionTime = Date.now();
-  saveCars(cars);
-  return car;
+// ── Payments ──────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/payments/{carId}
+ * Body: { cardLast4 }
+ * Returns the created Payment.
+ */
+export async function processPayment(carId, cardLast4) {
+  return apiFetch(`/api/payments/${carId}`, {
+    method: 'POST',
+    body: JSON.stringify({ cardLast4 }),
+  });
 }
 
-export function markCarPaid(id) {
-  const cars = getAllCars();
-  const car = cars.find(c => c.id === id);
-  if (!car) throw new Error('Car not found.');
-  car.paid = true;
-  saveCars(cars);
-  return car;
+// ── Stats (owner dashboard) ───────────────────────────────────────────────────
+
+/**
+ * GET /api/stats/today
+ * Returns { todayRevenue, carsWashed, avgWaitMins, queueLength }
+ */
+export async function getTodayStats() {
+  return apiFetch('/api/stats/today');
 }
 
-export function deleteCar(id) {
-  saveCars(getAllCars().filter(c => c.id !== id));
+/**
+ * GET /api/stats/revenue?days=7
+ * Returns array of { date, label, revenue }
+ */
+export async function getRevenueByDay(days = 7) {
+  return apiFetch(`/api/stats/revenue?days=${days}`);
 }
 
-export function getRevenueByDay(daysBack = 7) {
-  const result = [];
-  for (let i = daysBack - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
-    const end = new Date(d);
-    end.setHours(23, 59, 59, 999);
-    const cars = getAllCars().filter(
-      c => c.arrivalTime >= d.getTime() && c.arrivalTime <= end.getTime() && c.paid
-    );
-    const rev = cars.reduce((s, c) => s + SERVICE_PRICES[c.service], 0);
-    result.push({ date: d.getTime(), revenue: rev, label: i === 0 ? 'Today' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) });
-  }
-  return result;
-}
-
-export function exportToCSV() {
-  const cars = getAllCars();
+export async function exportToCSV() {
+  const cars = await getAllCars();
   if (!cars.length) return false;
+
   const header = ['ID', 'Name', 'Phone', 'Plate', 'Service', 'Status', 'Paid', 'Arrival', 'Completion'];
   const rows = cars.map(c => [
-    c.id, c.name, c.phone, c.plate || '',
-    c.service, c.status, c.paid ? 'Yes' : 'No',
-    new Date(c.arrivalTime).toLocaleString(),
+    c.id,
+    c.customerName,
+    c.phoneNumber,
+    c.licensePlate || '',
+    c.serviceType,
+    c.status,
+    c.paid ? 'Yes' : 'No',
+    c.arrivalTime ? new Date(c.arrivalTime).toLocaleString() : '',
     c.completionTime ? new Date(c.completionTime).toLocaleString() : '',
   ]);
-  const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+
+  const csv = [header, ...rows]
+    .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
   a.download = `carwash_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   return true;
-}
-
-export function loadDemoData() {
-  const now = Date.now();
-  const demo = [
-    { id: uid(), name: 'Lerato Dlamini',  phone: '0821234567', service: 'deluxe', plate: 'GP 123 ABC', status: 'Washing',  paid: false, arrivalTime: now - 18 * 60000, completionTime: null },
-    { id: uid(), name: 'Sipho Nkosi',     phone: '0731234567', service: 'basic',  plate: 'LIM 456 CD', status: 'Waiting',  paid: false, arrivalTime: now - 10 * 60000, completionTime: null },
-    { id: uid(), name: 'Zanele Mokoena',  phone: '0611234567', service: 'deluxe', plate: '',            status: 'Done',     paid: true,  arrivalTime: now - 50 * 60000, completionTime: now - 20 * 60000 },
-    { id: uid(), name: 'Thabo Sithole',   phone: '0841234567', service: 'basic',  plate: 'NW 789 EF',  status: 'Waiting',  paid: false, arrivalTime: now - 5  * 60000, completionTime: null },
-  ];
-  saveCars(demo);
 }
