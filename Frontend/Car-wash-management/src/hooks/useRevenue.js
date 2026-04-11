@@ -1,23 +1,47 @@
-import { useMemo } from 'react';
-import { useQueueContext } from '../context/QueueContext';
-import { getRevenueByDay } from '../api/cars';
-import { SERVICE_PRICES } from '../utils/constants';
-import { calcAvgWaitMinutes } from '../utils/waitTime';
+import { useState, useEffect } from 'react';
+import { getTodayStats, getRevenueByDay } from '../api/cars';
 
+/**
+ * Fetches owner dashboard stats from the Spring Boot API.
+ * Returns { revenue, washed, avgWait, queueLength, chartData, loading, error }
+ */
 export function useRevenue() {
-  const { todayCars, queue } = useQueueContext();
+  const [stats, setStats]     = useState({
+    revenue: 0,
+    washed: 0,
+    avgWait: null,
+    queueLength: 0,
+    chartData: [],
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState(null);
 
-  const stats = useMemo(() => {
-    const done    = todayCars.filter(c => c.status === 'Done');
-    const paid    = todayCars.filter(c => c.paid);
-    const revenue = paid.reduce((s, c) => s + SERVICE_PRICES[c.service], 0);
-    const avgWait = calcAvgWaitMinutes(done);
-    const chartData = getRevenueByDay(7);
-    // Seed non-zero mock values for days with no real data
-    const seeds = [40, 75, 30, 90, 55, 20];
-    chartData.forEach((d, i) => { if (d.revenue === 0 && i < 6) d.revenue = seeds[i]; });
-    return { revenue, washed: done.length, avgWait, queueLength: queue.length, chartData };
-  }, [todayCars, queue]);
+  useEffect(() => {
+    async function fetchStats() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [today, chart] = await Promise.all([
+          getTodayStats(),
+          getRevenueByDay(7),
+        ]);
+        setStats({
+          revenue:     today.todayRevenue,
+          washed:      today.carsWashed,
+          avgWait:     today.avgWaitMins,
+          queueLength: today.queueLength,
+          chartData:   chart,
+        });
+      } catch (err) {
+        console.error('[useRevenue] failed:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  return stats;
+    fetchStats();
+  }, []);
+
+  return { ...stats, loading, error };
 }

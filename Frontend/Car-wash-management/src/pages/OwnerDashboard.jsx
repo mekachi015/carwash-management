@@ -1,19 +1,32 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRevenue } from '../hooks/useRevenue';
-import { useQueueContext } from '../context/QueueContext';
 import { StatsCard } from '../components/StatsCard';
 import { StatusBadge } from '../components/StatusBadge';
-import { exportToCSV } from '../api/cars';
+import { getAllCars, exportToCSV } from '../api/cars';
 import { fmtTime } from '../utils/formatters';
 
 export function OwnerDashboard() {
-  const { revenue, washed, avgWait, queueLength, chartData } = useRevenue();
-  const { todayCars } = useQueueContext();
+  const { revenue, washed, avgWait, queueLength, chartData, loading } = useRevenue();
+  const [todayCars, setTodayCars] = useState([]);
+
   const chartRef  = useRef(null);
   const chartInst = useRef(null);
 
+  // Fetch today's cars from the API on mount
   useEffect(() => {
-    if (!chartRef.current || !window.Chart) return;
+    getAllCars()
+      .then(cars => {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const today = cars.filter(c => new Date(c.arrivalTime) >= startOfDay);
+        setTodayCars(today);
+      })
+      .catch(err => console.error('[OwnerDashboard] failed to load cars:', err));
+  }, []);
+
+  // Rebuild chart whenever chartData changes
+  useEffect(() => {
+    if (!chartRef.current || !window.Chart || !chartData.length) return;
     if (chartInst.current) chartInst.current.destroy();
     chartInst.current = new window.Chart(chartRef.current.getContext('2d'), {
       type: 'bar',
@@ -40,12 +53,19 @@ export function OwnerDashboard() {
     return () => { if (chartInst.current) chartInst.current.destroy(); };
   }, [chartData]);
 
-  function handleExport() {
-    const ok = exportToCSV();
-    if (!ok) alert('No data to export.');
+  async function handleExport() {
+    try {
+      const ok = await exportToCSV();
+      if (!ok) alert('No data to export.');
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    }
   }
 
-  const sorted = [...todayCars].sort((a, b) => a.arrivalTime - b.arrivalTime);
+  // Sort by arrivalTime ascending — comes back as ISO string from Spring Boot
+  const sorted = [...todayCars].sort(
+    (a, b) => new Date(a.arrivalTime) - new Date(b.arrivalTime)
+  );
 
   return (
     <div>
@@ -57,12 +77,16 @@ export function OwnerDashboard() {
         <button className="btn-outline" onClick={handleExport}>⬇ Export CSV</button>
       </div>
 
-      <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
-        <StatsCard label="Revenue Today"  value={`R${revenue}`}               sub="paid cars"        />
-        <StatsCard label="Cars Washed"    value={washed}                       sub="completed today"  />
-        <StatsCard label="Avg Wait Time"  value={avgWait ? `${avgWait}m` : '—'} sub="arrival to done" />
-        <StatsCard label="In Queue Now"   value={queueLength}                  sub="active"           />
-      </div>
+      {loading ? (
+        <p style={{ color: 'var(--gray-400)', marginBottom: '1.5rem' }}>Loading stats...</p>
+      ) : (
+        <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
+          <StatsCard label="Revenue Today"  value={`$${revenue}`}                sub="paid cars"       />
+          <StatsCard label="Cars Washed"    value={washed}                        sub="completed today" />
+          <StatsCard label="Avg Wait Time"  value={avgWait ? `${avgWait}m` : '—'} sub="arrival to done" />
+          <StatsCard label="In Queue Now"   value={queueLength}                   sub="active"          />
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h2>Last 7 Days Revenue</h2>
@@ -87,13 +111,20 @@ export function OwnerDashboard() {
               <tbody>
                 {sorted.map(c => (
                   <tr key={c.id}>
-                    <td><strong>{c.name}</strong></td>
-                    <td style={{ color: 'var(--gray-500)' }}>{c.phone}</td>
-                    <td style={{ color: 'var(--gray-500)' }}>{c.plate || '—'}</td>
-                    <td style={{ textTransform: 'capitalize' }}>{c.service}</td>
+                    {/* Spring Boot field names — customerName not name, phoneNumber not phone etc. */}
+                    <td><strong>{c.customerName}</strong></td>
+                    <td style={{ color: 'var(--gray-500)' }}>{c.phoneNumber}</td>
+                    <td style={{ color: 'var(--gray-500)' }}>{c.licensePlate || '—'}</td>
+                    <td style={{ textTransform: 'capitalize' }}>{c.serviceType}</td>
                     <td><StatusBadge status={c.status} /></td>
-                    <td>{c.paid ? <span className="tag-paid">Paid</span> : <span className="tag-unpaid">Unpaid</span>}</td>
-                    <td style={{ color: 'var(--gray-500)', fontSize: '0.8rem' }}>{fmtTime(c.arrivalTime)}</td>
+                    <td>
+                      {c.paid
+                        ? <span className="tag-paid">Paid</span>
+                        : <span className="tag-unpaid">Unpaid</span>}
+                    </td>
+                    <td style={{ color: 'var(--gray-500)', fontSize: '0.8rem' }}>
+                      {c.arrivalTime ? fmtTime(new Date(c.arrivalTime).getTime()) : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -74,7 +74,7 @@ export function PublicQueue() {
                 {queue.map((car, i) => (
                   <tr key={car.id}>
                     <td><strong>{i + 1}</strong></td>
-                    <td style={{ textTransform: 'capitalize' }}>{car.service}</td>
+                    <td style={{ textTransform: 'capitalize' }}>{car.serviceType}</td>
                     <td><StatusBadge status={car.status} /></td>
                     <td>{calcEstimatedWait(i)} min</td>
                   </tr>
