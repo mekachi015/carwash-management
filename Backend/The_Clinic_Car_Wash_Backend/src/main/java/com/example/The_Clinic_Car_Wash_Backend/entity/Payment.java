@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "payments")
+//@Document(collection = "payments")
 public class Payment {
     @Id
     private String id;

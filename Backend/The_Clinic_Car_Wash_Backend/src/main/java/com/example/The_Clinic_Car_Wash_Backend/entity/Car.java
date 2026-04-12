@@ -14,6 +14,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 import com.example.The_Clinic_Car_Wash_Backend.enumarated.WashStatus;
+import com.example.The_Clinic_Car_Wash_Backend.enumarated.WashType;
+import com.example.The_Clinic_Car_Wash_Backend.entity.Payment; // Make sure this exists
 
 @Data
 @Builder
@@ -32,8 +34,8 @@ public class Car {
     @Field("phone")
     private String phoneNumber;
  
-    /** "basic" ($10) or "deluxe" ($20) */
-    private String serviceType;
+    @Builder.Default
+    private WashType serviceType = WashType.BASIC;
  
     private String licensePlate;
  
@@ -49,6 +51,8 @@ public class Car {
  
     private LocalDateTime completionTime;
  
+    //@OneToOne(mappedBy = "car", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Payment payment;
  
     // ── Convenience methods ──────────────────────────────────────────────────
  
@@ -57,6 +61,6 @@ public class Car {
     }
  
     public int getServicePrice() {
-        return "deluxe".equalsIgnoreCase(this.serviceType) ? 20 : 10;
+        return WashType.DELUXE == this.serviceType ? 200 : 100;
     }
 }
