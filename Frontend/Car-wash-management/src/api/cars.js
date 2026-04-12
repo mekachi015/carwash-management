@@ -103,18 +103,26 @@ export async function exportToCSV() {
   const cars = await getAllCars();
   if (!cars.length) return false;
 
-  const header = ['ID', 'Name', 'Phone', 'Plate', 'Service', 'Status', 'Paid', 'Arrival', 'Completion'];
-  const rows = cars.map(c => [
-    c.id,
-    c.customerName,
-    c.phoneNumber,
-    c.licensePlate || '',
-    c.serviceType,
-    c.status,
-    c.paid ? 'Yes' : 'No',
-    c.arrivalTime ? new Date(c.arrivalTime).toLocaleString() : '',
-    c.completionTime ? new Date(c.completionTime).toLocaleString() : '',
-  ]);
+  // Added 'Price' to the header
+  const header = ['ID', 'Name', 'Phone', 'Plate', 'Service', 'Price', 'Status', 'Paid', 'Arrival', 'Completion'];
+  
+  const rows = cars.map(c => {
+    // Simple logic to match your backend pricing
+    const price = c.serviceType === 'DELUXE' ? 200 : 100;
+    
+    return [
+      c.id,
+      c.customerName,
+      c.phoneNumber,
+      c.licensePlate || '',
+      c.serviceType,
+      `R${price}`, // Added Price column
+      c.status,
+      c.paid ? 'Yes' : 'No',
+      c.arrivalTime ? new Date(c.arrivalTime).toLocaleString() : '',
+      c.completionTime ? new Date(c.completionTime).toLocaleString() : '',
+    ];
+  });
 
   const csv = [header, ...rows]
     .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
@@ -122,7 +130,7 @@ export async function exportToCSV() {
 
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = `carwash_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `carwash_report_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   return true;
 }
