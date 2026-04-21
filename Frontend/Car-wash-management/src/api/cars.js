@@ -1,4 +1,5 @@
 import { apiFetch } from './index';
+import axios from 'axios'; // Add this line
 
 // ── Queue (public page) ───────────────────────────────────────────────────────
 
@@ -23,9 +24,14 @@ export async function getAllCars() {
 /**
  * GET /api/cars/{id}
  */
-export async function getCarById(id) {
-  return apiFetch(`/api/cars/${id}`);
-}
+// export async function getCarById(id) {
+//   return apiFetch(`/api/cars/${id}`);
+// }
+
+export const getCarById = async (id) => {
+  const response = await axios.get(`/api/cars/${id}`);
+  return response.data;
+};
 
 /**
  * GET /api/cars/by-phone/{phoneNumber}
@@ -74,11 +80,21 @@ export async function deleteCar(id) {
  * Body: { cardLast4 }
  * Returns the created Payment.
  */
-export async function processPayment(carId, cardLast4) {
-  return apiFetch(`/api/payments/${carId}`, {
-    method: 'POST',
-    body: JSON.stringify({ cardLast4 }),
-  });
+// export async function initiatePayment(carId, customerEmail) {
+//   return apiFetch(`/api/payments/initiate`, {
+//     method: 'POST',
+//     body: JSON.stringify({ carId, customerEmail }),
+//   });
+// }
+
+export const initiatePayment = async (payload) => {
+  const response = await axios.post('/api/payments/initiate', payload);
+  return response.data;
+};
+
+//poll  payment
+export async function getPaymentStatus(paymentToken){
+  return apiFetch(`/api/payments/${paymentToken}/status`);
 }
 
 // ── Stats (owner dashboard) ───────────────────────────────────────────────────
@@ -89,6 +105,7 @@ export async function processPayment(carId, cardLast4) {
  */
 export async function getTodayStats() {
   return apiFetch('/api/stats/today');
+  //return apiFetch('/api/stats/today');
 }
 
 /**
@@ -97,24 +114,33 @@ export async function getTodayStats() {
  */
 export async function getRevenueByDay(days = 7) {
   return apiFetch(`/api/stats/revenue?days=${days}`);
+  //return apiFetch(`/api/stats/revenue?days=${days}`);
 }
 
 export async function exportToCSV() {
   const cars = await getAllCars();
   if (!cars.length) return false;
 
-  const header = ['ID', 'Name', 'Phone', 'Plate', 'Service', 'Status', 'Paid', 'Arrival', 'Completion'];
-  const rows = cars.map(c => [
-    c.id,
-    c.customerName,
-    c.phoneNumber,
-    c.licensePlate || '',
-    c.serviceType,
-    c.status,
-    c.paid ? 'Yes' : 'No',
-    c.arrivalTime ? new Date(c.arrivalTime).toLocaleString() : '',
-    c.completionTime ? new Date(c.completionTime).toLocaleString() : '',
-  ]);
+  // Added 'Price' to the header
+  const header = ['ID', 'Name', 'Phone', 'Plate', 'Service', 'Price', 'Status', 'Paid', 'Arrival', 'Completion'];
+  
+  const rows = cars.map(c => {
+    // Simple logic to match your backend pricing
+    const price = c.serviceType === 'DELUXE' ? 200 : 100;
+    
+    return [
+      c.id,
+      c.customerName,
+      c.phoneNumber,
+      c.licensePlate || '',
+      c.serviceType,
+      `R${price}`, // Added Price column
+      c.status,
+      c.paid ? 'Yes' : 'No',
+      c.arrivalTime ? new Date(c.arrivalTime).toLocaleString() : '',
+      c.completionTime ? new Date(c.completionTime).toLocaleString() : '',
+    ];
+  });
 
   const csv = [header, ...rows]
     .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
@@ -122,7 +148,7 @@ export async function exportToCSV() {
 
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = `carwash_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `carwash_report_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   return true;
 }

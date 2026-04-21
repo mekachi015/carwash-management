@@ -41,6 +41,21 @@ export function CarCard({ car, position, onUpdate }) {
     }
   }
 
+  // 1. The Switch Logic
+  const getPrice = () => {
+    switch (car.serviceType) {
+      case 'DELUXE':
+        return 200;
+      case 'BASIC':
+        return 100;
+      default:
+        return 0;
+    }
+  };
+
+  
+
+
   async function handleDelete() {
     if (!window.confirm('Remove this car from the queue?')) return;
     setLoading(true);
@@ -70,7 +85,7 @@ export function CarCard({ car, position, onUpdate }) {
             {car.licensePlate ? ` · ${car.licensePlate}` : ''}
             {' · '}
             <span style={{ textTransform: 'capitalize' }}>{car.serviceType}</span>
-            {' — $'}{SERVICE_PRICES[car.serviceType] ?? '?'}
+            {' — R'}{getPrice()}
           </div>
         </div>
         <StatusBadge status={car.status} />

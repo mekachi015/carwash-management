@@ -14,20 +14,45 @@ export function AddCarForm() {
 
   async function handleSubmit() {
     setMessage(null);
+    
+    // Validation
     if (!form.customerName.trim() || !form.phoneNumber.trim()) {
       setMessage({ type: 'error', text: 'Customer name and phone number are required.' });
       return;
     }
 
+    // --- Phone Number Normalization (E.164) ---
+    let cleanPhone = form.phoneNumber.replace(/\D/g, ''); // Remove all non-digits
+    
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '+27' + cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('27')) {
+      cleanPhone = '+' + cleanPhone;
+    } else if (!cleanPhone.startsWith('+')) {
+      // Default fallback for Phalaborwa/South Africa if no code is provided
+      cleanPhone = '+27' + cleanPhone;
+    }
+
     setLoading(true);
     try {
-      const car = await addCar(form);
+      // Normalize data for the Backend:
+      // 1. phoneNumber in +27... format
+      // 2. serviceType in UPPERCASE to match Java Enum
+      const submission = { 
+        ...form, 
+        phoneNumber: cleanPhone,
+        serviceType: form.serviceType.toUpperCase() 
+      };
+      
+      const car = await addCar(submission);
       await refresh();
+      
       setForm({ customerName: '', phoneNumber: '', serviceType: 'basic', licensePlate: '' });
-      setMessage({ type: 'success', text: `${car.customerName}'s car added to the queue.` });
+      setMessage({ type: 'success', text: `${car.customerName}'s car added! Notification sent. ✅` });
+      
       setTimeout(() => setMessage(null), 3000);
-    } catch (err) {
-      setMessage({ type: 'warning', text: err.message });
+    } catch{
+      setMessage({ type: 'warning', text: "Failed to add car. Check if backend is running." });
     } finally {
       setLoading(false);
     }
