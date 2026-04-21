@@ -6,8 +6,8 @@ import com.example.The_Clinic_Car_Wash_Backend.entity.Car;
 import com.example.The_Clinic_Car_Wash_Backend.enumarated.WashStatus;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
- 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -23,4 +23,7 @@ public interface CarRepository extends MongoRepository<Car, String> {
  List<Car> findByArrivalTimeAfter(LocalDateTime since);
 
  List<Car> findByStatusAndArrivalTimeAfter(WashStatus status, LocalDateTime since);
+
+@Query("{ '$or': [ { 'status': { '$ne': ?0 } }, { 'status': ?0, 'paid': false } ] }")
+List<Car> findActiveOrUnpaidDone(WashStatus doneStatus);
 }

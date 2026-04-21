@@ -1,20 +1,20 @@
-import { useEffect, useState } from 'react';
-import { getPaymentStatus } from '../api/cars';
+import { useEffect, useState } from "react";
+import { getPaymentStatus } from "../api/cars";
 
 export function PaymentReturn({ onNavigate }) {
   // PayFast sends the token back in the URL as 'm_payment_id'
-  const [status, setStatus] = useState('checking');
-  const [error, setError] = useState('');
+  const [status, setStatus] = useState("checking");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     //const query = new URLSearchParams(window.location.search);
     const token =
-      sessionStorage.getItem('paymentToken') ||
-      localStorage.getItem('paymentToken');
+      sessionStorage.getItem("paymentToken") ||
+      localStorage.getItem("paymentToken");
 
     if (!token) {
-      setStatus('error');
-       setError('Missing payment reference. Please check your status page.');
+      setStatus("error");
+      setError("Missing payment reference. Please check your status page.");
       return;
     }
 
@@ -25,26 +25,35 @@ export function PaymentReturn({ onNavigate }) {
       try {
         const result = await getPaymentStatus(token);
 
-        if (result.status === 'COMPLETE') {
-          setStatus('success');
-          sessionStorage.removeItem('pay_car');
-          sessionStorage.removeItem('paymentToken');
-          localStorage.removeItem('paymentToken');
-        } else if (result.status === 'FAILED' || result.status === 'CANCELLED') {
-          setStatus('failed');
+        if (result.status === "COMPLETE") {
+          setStatus("success");
+          sessionStorage.removeItem("paymentToken");
+          localStorage.removeItem("paymentToken");
+          sessionStorage.removeItem("pay_car");
+          // Store carId for the navigate button
+          if (result.carId) {
+            sessionStorage.setItem("status_car", result.carId);
+          }
+        } else if (
+          result.status === "FAILED" ||
+          result.status === "CANCELLED"
+        ) {
+          setStatus("failed");
           setError(`The transaction was ${result.status.toLowerCase()}.`);
         } else {
           if (attempts < MAX_ATTEMPTS) {
             attempts++;
             setTimeout(checkStatus, 3000);
           } else {
-            setStatus('failed');
-            setError('Payment is taking longer than expected. Please check the status page.');
+            setStatus("failed");
+            setError(
+              "Payment is taking longer than expected. Please check the status page.",
+            );
           }
         }
       } catch {
-        setStatus('error');
-        setError('Connection lost. Please check your car status manually.');
+        setStatus("error");
+        setError("Connection lost. Please check your car status manually.");
       }
     };
 
@@ -52,34 +61,79 @@ export function PaymentReturn({ onNavigate }) {
   }, []);
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4rem' }}>
-      <div className="card" style={{ maxWidth: 400, textAlign: 'center', width: '100%' }}>
-        
-        {status === 'checking' && (
+    <div
+      style={{ display: "flex", justifyContent: "center", paddingTop: "4rem" }}
+    >
+      <div
+        className="card"
+        style={{ maxWidth: 400, textAlign: "center", width: "100%" }}
+      >
+        {status === "checking" && (
           <>
-            <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+            <div className="spinner" style={{ margin: "0 auto 1rem" }}></div>
             <h2>Verifying Payment...</h2>
-            <p style={{ color: 'var(--gray-500)' }}>Finalizing your transaction with PayFast.</p>
+            <p style={{ color: "var(--gray-500)" }}>
+              Finalizing your transaction with PayFast.
+            </p>
           </>
         )}
 
-        {status === 'success' && (
+        {status === "success" && (
           <>
-            <div className="success-icon" style={{ background: 'var(--green)', color: 'white', fontSize: '2rem', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>✓</div>
-            <h2 style={{ color: 'var(--green)' }}>Payment Received!</h2>
-            <p style={{ color: 'var(--gray-500)', marginBottom: '1.5rem' }}>Your car is now marked as paid in the system.</p>
-            <button className="btn-primary" style={{ width: '100%' }} onClick={() => onNavigate?.('status')}>
+            <div
+              className="success-icon"
+              style={{
+                background: "var(--green)",
+                color: "white",
+                fontSize: "2rem",
+                width: "60px",
+                height: "60px",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 1rem",
+              }}
+            >
+              ✓
+            </div>
+            <h2 style={{ color: "var(--green)" }}>Payment Received!</h2>
+            <p style={{ color: "var(--gray-500)", marginBottom: "1.5rem" }}>
+              Your car is now marked as paid in the system.
+            </p>
+            <button
+              className="btn-primary"
+              style={{ width: "100%" }}
+              onClick={() => {
+                const carId = sessionStorage.getItem("status_car");
+                window.location.href = carId ? `/status/${carId}` : "/status";
+              }}
+            >
               View Wash Status
             </button>
           </>
         )}
 
-        {(status === 'failed' || status === 'error') && (
+        {(status === "failed" || status === "error") && (
           <>
-            <div style={{ color: 'var(--red)', fontSize: '3rem', marginBottom: '1rem' }}>⚠</div>
+            <div
+              style={{
+                color: "var(--red)",
+                fontSize: "3rem",
+                marginBottom: "1rem",
+              }}
+            >
+              ⚠
+            </div>
             <h2>Something went wrong</h2>
-            <p style={{ color: 'var(--gray-500)', marginBottom: '1.5rem' }}>{error}</p>
-            <button className="btn-primary" style={{ width: '100%' }} onClick={() => onNavigate?.('payment')}>
+            <p style={{ color: "var(--gray-500)", marginBottom: "1.5rem" }}>
+              {error}
+            </p>
+            <button
+              className="btn-primary"
+              style={{ width: "100%" }}
+              onClick={() => onNavigate?.("payment")}
+            >
               Try Again
             </button>
           </>

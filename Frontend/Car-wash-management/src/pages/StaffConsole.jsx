@@ -10,7 +10,7 @@ export function StaffConsole() {
       <h1>Staff Console</h1>
       <p style={{ color: 'var(--gray-500)', marginBottom: '1.5rem' }}>Manage the wash queue.</p>
 
-      <AddCarForm />
+      
 
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
@@ -33,8 +33,14 @@ export function StaffConsole() {
           ))
         )}
       </div>
+
+      <AddCarForm />
     </div>
+
+    
   );
+
+  
 }
 
 export default StaffConsole;

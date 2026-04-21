@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCarStatus } from '../hooks/useCarStatus';
 import { WashProgressSteps } from '../components/WashProgressSteps';
 import { StatusBadge } from '../components/StatusBadge';
 import { calcEstimatedWait } from '../utils/waitTime';
 import { SERVICE_PRICES } from '../utils/constants';
-import { useNavigate } from 'react-router-dom'; // 1. Import the hook
+import { useNavigate, useParams} from 'react-router-dom'; // 1. Import the hook
 
 export function CustomerStatus() {
   const [phone, setPhone] = useState('');
-  const { car, error, lookup } = useCarStatus();
+  const { car, error, lookup , lookupById} = useCarStatus();
   const navigate = useNavigate()
+  const { carId } = useParams();
+
+   useEffect(() => {
+    if (carId) {
+      lookupById(carId);
+    }
+  }, [carId]);
 
   // --- Helper to normalize phone number ---
   const handleLookup = () => {

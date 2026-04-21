@@ -1,6 +1,6 @@
 export const MINS_PER_CAR=20;
 
-export const STATUSES = ['Waiting', 'Washing', 'Drying', 'Done'];
+export const STATUSES = ['Waiting', 'Washing', 'Rinsing', 'Drying', 'Done'];
 
 export const SERVICE_PRICES = {
   basic: 100,

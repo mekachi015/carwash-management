@@ -34,9 +34,11 @@ public class CarService {
      * Cars are already sorted by arrival time via the repository query.
      */
     public QueueResponse getQueue() {
-        List<Car> queue = carRepository.findByStatusNotOrderByArrivalTimeAsc(WashStatus.DONE);
+        List<Car> queue = carRepository.findActiveOrUnpaidDone(WashStatus.DONE)
+                .stream()
+                .sorted(java.util.Comparator.comparing(Car::getArrivalTime))
+                .toList();
 
-        // Attach estimated wait to each car position
         for (int i = 0; i < queue.size(); i++) {
             System.out.printf("[QueueService] Car '%s' at position %d — est. wait: %d min%n",
                     queue.get(i).getCustomerName(), i + 1, queueService.calcWaitMinutes(i));
