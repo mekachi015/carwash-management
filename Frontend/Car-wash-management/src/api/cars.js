@@ -1,4 +1,5 @@
 import { apiFetch } from './index';
+import axios from 'axios'; // Add this line
 
 // ── Queue (public page) ───────────────────────────────────────────────────────
 
@@ -23,9 +24,14 @@ export async function getAllCars() {
 /**
  * GET /api/cars/{id}
  */
-export async function getCarById(id) {
-  return apiFetch(`/api/cars/${id}`);
-}
+// export async function getCarById(id) {
+//   return apiFetch(`/api/cars/${id}`);
+// }
+
+export const getCarById = async (id) => {
+  const response = await axios.get(`/api/cars/${id}`);
+  return response.data;
+};
 
 /**
  * GET /api/cars/by-phone/{phoneNumber}
@@ -74,11 +80,21 @@ export async function deleteCar(id) {
  * Body: { cardLast4 }
  * Returns the created Payment.
  */
-export async function processPayment(carId, cardLast4) {
-  return apiFetch(`/api/payments/${carId}`, {
-    method: 'POST',
-    body: JSON.stringify({ cardLast4 }),
-  });
+// export async function initiatePayment(carId, customerEmail) {
+//   return apiFetch(`/api/payments/initiate`, {
+//     method: 'POST',
+//     body: JSON.stringify({ carId, customerEmail }),
+//   });
+// }
+
+export const initiatePayment = async (payload) => {
+  const response = await axios.post('/api/payments/initiate', payload);
+  return response.data;
+};
+
+//poll  payment
+export async function getPaymentStatus(paymentToken){
+  return apiFetch(`/api/payments/${paymentToken}/status`);
 }
 
 // ── Stats (owner dashboard) ───────────────────────────────────────────────────

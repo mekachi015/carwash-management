@@ -84,7 +84,7 @@ public class CarService {
         Car car = Car.builder()
                 .customerName(request.getCustomerName())
                 .phoneNumber(request.getPhoneNumber())
-                .serviceType(WashType.valueOf(request.getServiceType().toUpperCase()))
+                .serviceType(request.getServiceType())
                 .licensePlate(request.getLicensePlate())
                 .build();
 

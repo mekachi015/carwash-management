@@ -1,33 +1,24 @@
 import { useState, useEffect } from "react";
-import { getCarById, getCarByPhone, processPayment } from "../api/cars";
+import { getCarById, getCarByPhone, initiatePayment } from "../api/cars";
 import { useQueueContext } from "../context/QueueContext";
-import { fmtCardNumber, fmtExpiry } from "../utils/formatters";
 
-// Match your backend prices (e.g., R100 for Basic, R200 for Deluxe)
 const SERVICE_PRICES = { BASIC: 100, DELUXE: 200 };
 
 export function Payment({ onNavigate }) {
-  const { refresh } = useQueueContext();
+  useQueueContext();
 
-  // State for searching
+  // Search and Car State
   const [phoneSearch, setPhoneSearch] = useState("");
   const [searching, setSearching] = useState(false);
-
-  // Existing states
+  const [email, setEmail] = useState("");
   const [id, setId] = useState(sessionStorage.getItem("pay_car"));
   const [car, setCar] = useState(null);
+  
+  // UI State
   const [loaded, setLoaded] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    number: "",
-    expiry: "",
-    cvc: "",
-    name: "",
-  });
 
-  // Load car if ID exists in session
   useEffect(() => {
     if (!id) {
       setLoaded(true);
@@ -44,7 +35,6 @@ export function Payment({ onNavigate }) {
       });
   }, [id]);
 
-  // Handler to search by phone
   async function handleSearch(e) {
     e.preventDefault();
     if (!phoneSearch) return;
@@ -57,7 +47,7 @@ export function Payment({ onNavigate }) {
         setError("This car is already paid for.");
       } else {
         setCar(foundCar);
-        setId(foundCar.id);
+        setId(String(foundCar.id));
         sessionStorage.setItem("pay_car", foundCar.id);
       }
     } catch {
@@ -67,48 +57,49 @@ export function Payment({ onNavigate }) {
     }
   }
 
-  function update(field, raw) {
-    let val = raw;
-    if (field === "number") val = fmtCardNumber(raw);
-    if (field === "expiry") val = fmtExpiry(raw);
-    setForm((f) => ({ ...f, [field]: val }));
-  }
-
   async function handlePay() {
-    // 1. Create the 'clean' variable
-    const clean = form.number.replace(/\s/g, "");
-
-    // 2. Validate
-    if (clean.length < 12 || !form.expiry || form.cvc.length < 3) {
-      setError("Please fill in all card details correctly.");
-      return;
-    }
-
-    // 3. DEFINE cardLast4 HERE
-    const cardLast4 = clean.slice(-4);
-
-    setLoading(true);
-    setError("");
-
-    try {
-      await processPayment(id, cardLast4);
-      await refresh();
-      setSuccess(true);
-    } catch (err) {
-      setError(err.message || "Payment failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+  if (!email || !email.includes("@")) {
+    setError("Please enter a valid email for your receipt.");
+    return;
   }
+ 
+  setLoading(true);
+  setError("");
+ 
+  try {
+    const data = await initiatePayment({ carId: id, customerEmail: email });
+    // data = { payfastUrl, payfastParams, paymentToken, amount, customerName }
+ 
+    sessionStorage.setItem("paymentToken", data.paymentToken);
+ 
+    // ── Build a hidden form and auto-submit it to PayFast ──────────────────
+    // This is the correct PayFast integration method.
+    // A GET redirect encodes the URL values twice, breaking the signature.
+    // A form POST sends the raw values exactly as signed.
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = data.payfastUrl;
+ 
+    Object.entries(data.payfastParams).forEach(([key, value]) => {
+      const input = document.createElement("input");
+      input.type  = "hidden";
+      input.name  = key;
+      input.value = value;
+      form.appendChild(input);
+    });
+ 
+    document.body.appendChild(form);
+    form.submit();   // Browser encodes values exactly once — PayFast expects this
+ 
+  } catch (err) {
+    setError(err.response?.data?.error || "Could not start payment.");
+    setLoading(false);
+  }
+}
 
-  if (!loaded)
-    return (
-      <div className="loading-container">
-        <p>Loading...</p>
-      </div>
-    );
+  if (!loaded) return <div className="loading-container"><p>Loading...</p></div>;
 
-  // STEP 1: If no car is selected/found yet, show the Search Screen
+  // SCREEN 1: Search for car
   if (!id && !car) {
     return (
       <div>
@@ -128,16 +119,18 @@ export function Payment({ onNavigate }) {
                 required
               />
             </div>
-            {error && (
-              <div className="alert alert-error" style={{ marginTop: "1rem" }}>
-                {error}
-              </div>
-            )}
-            <button
-              className="btn-primary"
-              style={{ width: "100%", marginTop: "1rem" }}
-              disabled={searching}
-            >
+            <div className="form-row">
+              <label>Email Address (for receipt)</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="customer@example.com"
+              />
+            </div>
+            {error && <div className="alert alert-error">{error}</div>}
+            <button className="btn-primary" style={{ width: "100%", marginTop: "1rem" }} disabled={searching}>
               {searching ? "Searching..." : "Find My Car"}
             </button>
           </form>
@@ -146,44 +139,21 @@ export function Payment({ onNavigate }) {
     );
   }
 
-  // STEP 2: Show Success Screen
-  if (car?.paid || success) {
+  // SCREEN 2: Already Paid (Success)
+  if (car?.paid) {
     return (
       <div>
         <h1>Payment</h1>
-        <div
-          className="card"
-          style={{
-            maxWidth: 480,
-            textAlign: "center",
-            padding: "2.5rem 1.5rem",
-            marginTop: "1rem",
-          }}
-        >
-          <div
-            style={
-              {
-                /* styles... */
-              }
-            }
-          >
-            ✓
-          </div>
+        <div className="card" style={{ maxWidth: 480, textAlign: "center", padding: "2.5rem 1.5rem" }}>
+          <div className="success-icon">✓</div>
           <h2 style={{ color: "var(--green)" }}>Payment Successful</h2>
           <p style={{ color: "var(--gray-500)", margin: "0.5rem 0 1.5rem" }}>
             Payment complete for {car?.customerName}. Thank you!
           </p>
-          <button
-            className="btn-primary"
-            onClick={() => {
-              sessionStorage.removeItem("pay_car");
-              // FIXED: Using the onNavigate prop instead of window.location
-              onNavigate?.("status");
-
-              // Fallback if onNavigate isn't provided
-              if (!onNavigate) window.location.href = "/";
-            }}
-          >
+          <button className="btn-primary" onClick={() => {
+            sessionStorage.removeItem("pay_car");
+            onNavigate?.("status");
+          }}>
             Back to Home
           </button>
         </div>
@@ -191,91 +161,61 @@ export function Payment({ onNavigate }) {
     );
   }
 
-  // STEP 3: Show the Payment Form
+  // SCREEN 3: Checkout Redirect
   const amount = SERVICE_PRICES[car?.serviceType] ?? "0";
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Checkout</h1>
-        <button
-          className="btn-sm"
-          onClick={() => {
+        <button className="btn-sm" onClick={() => {
             sessionStorage.removeItem("pay_car");
             setCar(null);
             setId(null);
-          }}
-        >
+        }}>
           Change Car
         </button>
       </div>
+
       <div className="card" style={{ maxWidth: 480, marginTop: "1rem" }}>
         <div style={{ marginBottom: "1.25rem" }}>
           <h2>{car?.customerName}</h2>
           <p style={{ color: "var(--gray-500)", fontSize: "0.875rem" }}>
-            {car?.serviceType} WASH{" "}
-            {car?.licensePlate ? ` · ${car.licensePlate}` : ""}
+            {car?.serviceType} WASH {car?.licensePlate ? ` · ${car.licensePlate}` : ""}
           </p>
         </div>
+
         <div className="stat" style={{ marginBottom: "1.25rem" }}>
           <div className="stat-label">Amount Due</div>
           <div className="stat-value">R{amount}</div>
         </div>
 
-        <h3 style={{ marginBottom: "1rem" }}>Card Details</h3>
-        <div className="cc-grid">
-          {/* ... Input fields exactly as you had them ... */}
-          <div className="cc-full form-row">
-            <label>Card Number</label>
-            <input
-              className="cc-input"
-              placeholder="1234 5678 9012 3456"
-              value={form.number}
-              onChange={(e) => update("number", e.target.value)}
-              maxLength={19}
-            />
-          </div>
-          <div className="form-row">
-            <label>Expiry</label>
-            <input
-              className="cc-input"
-              placeholder="MM/YY"
-              value={form.expiry}
-              onChange={(e) => update("expiry", e.target.value)}
-              maxLength={5}
-            />
-          </div>
-          <div className="form-row">
-            <label>CVC</label>
-            <input
-              className="cc-input"
-              placeholder="123"
-              value={form.cvc}
-              onChange={(e) => update("cvc", e.target.value)}
-              maxLength={3}
-            />
-          </div>
+        {/* --- ADDED EMAIL SECTION START --- */}
+        <div className="form-row" style={{ marginBottom: "1.5rem" }}>
+          <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600" }}>
+            Email Address (for your receipt)
+          </label>
+          <input
+            type="email"
+            placeholder="your@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ width: "100%", padding: "0.75rem", borderRadius: "8px", border: "1px solid var(--gray-300)" }}
+            required
+          />
+        </div>
+        {/* --- ADDED EMAIL SECTION END --- */}
+
+        <div className="payment-notice" style={{ padding: "1rem", background: "#f8fafc", borderRadius: "8px", marginBottom: "1.5rem" }}>
+          <p style={{ fontSize: "0.875rem", color: "var(--gray-600)", margin: 0 }}>
+            You will be redirected to <strong>PayFast</strong> to complete your R{amount} payment securely.
+          </p>
         </div>
 
-        {error && (
-          <div className="alert alert-error" style={{ margin: "1rem 0" }}>
-            {error}
-          </div>
-        )}
+        {error && <div className="alert alert-error" style={{ marginBottom: "1rem" }}>{error}</div>}
 
-        <button
-          className="btn-success btn-lg"
-          style={{ width: "100%" }}
-          onClick={handlePay}
-          disabled={loading}
-        >
-          {loading ? "Processing..." : `Pay R${amount} Now`}
+        <button className="btn-success btn-lg" style={{ width: "100%" }} onClick={handlePay} disabled={loading}>
+          {loading ? "Redirecting..." : "Pay with PayFast"}
         </button>
       </div>
     </div>

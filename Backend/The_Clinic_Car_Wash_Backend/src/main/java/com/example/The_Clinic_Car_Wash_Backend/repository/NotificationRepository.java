@@ -10,7 +10,7 @@ import com.example.The_Clinic_Car_Wash_Backend.enumarated.NotificationStatus;
 import com.example.The_Clinic_Car_Wash_Backend.enumarated.NotificationType;
 
 @Repository
-public interface NotificationRepository extends MongoRepository<NotificationLog, Long> {
+public interface NotificationRepository extends MongoRepository<NotificationLog, String> {
     List<NotificationLog> findByPhoneNumber(String phoneNumber);
 
     List<NotificationLog> findByType(NotificationType type);
