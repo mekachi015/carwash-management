@@ -4,6 +4,9 @@ import { StatsCard } from '../components/StatsCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { getAllCars, exportToCSV } from '../api/cars';
 import { fmtTime } from '../utils/formatters';
+import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
+
+Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 export function OwnerDashboard() {
   const { revenue, washed, avgWait, queueLength, chartData, loading } = useRevenue();
@@ -12,7 +15,6 @@ export function OwnerDashboard() {
   const chartRef  = useRef(null);
   const chartInst = useRef(null);
 
-  // Fetch today's cars from the API on mount
   useEffect(() => {
     getAllCars()
       .then(cars => {
@@ -24,16 +26,17 @@ export function OwnerDashboard() {
       .catch(err => console.error('[OwnerDashboard] failed to load cars:', err));
   }, []);
 
-  // Rebuild chart whenever chartData changes
+  // ← Only change: window.Chart → Chart, and removed the !window.Chart guard
   useEffect(() => {
-    if (!chartRef.current || !window.Chart || !chartData.length) return;
+    if (!chartRef.current || !chartData.length) return;
     if (chartInst.current) chartInst.current.destroy();
-    chartInst.current = new window.Chart(chartRef.current.getContext('2d'), {
+
+    chartInst.current = new Chart(chartRef.current.getContext('2d'), {
       type: 'bar',
       data: {
         labels: chartData.map(d => d.label),
         datasets: [{
-          label: 'Revenue ($)',
+          label: 'Revenue (R)',
           data: chartData.map(d => d.revenue),
           backgroundColor: 'rgba(37,99,235,0.7)',
           borderRadius: 4,
@@ -45,11 +48,12 @@ export function OwnerDashboard() {
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          y: { beginAtZero: true, ticks: { callback: v => '$' + v } },
+          y: { beginAtZero: true, ticks: { callback: v => 'R' + v } },
           x: { grid: { display: false } },
         },
       },
     });
+
     return () => { if (chartInst.current) chartInst.current.destroy(); };
   }, [chartData]);
 
@@ -62,7 +66,6 @@ export function OwnerDashboard() {
     }
   }
 
-  // Sort by arrivalTime ascending — comes back as ISO string from Spring Boot
   const sorted = [...todayCars].sort(
     (a, b) => new Date(a.arrivalTime) - new Date(b.arrivalTime)
   );
@@ -81,7 +84,7 @@ export function OwnerDashboard() {
         <p style={{ color: 'var(--gray-400)', marginBottom: '1.5rem' }}>Loading stats...</p>
       ) : (
         <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
-          <StatsCard label="Revenue Today"  value={`$${revenue}`}                sub="paid cars"       />
+          <StatsCard label="Revenue Today"  value={`R${revenue}`}                sub="paid cars"       />
           <StatsCard label="Cars Washed"    value={washed}                        sub="completed today" />
           <StatsCard label="Avg Wait Time"  value={avgWait ? `${avgWait}m` : '—'} sub="arrival to done" />
           <StatsCard label="In Queue Now"   value={queueLength}                   sub="active"          />
@@ -111,7 +114,6 @@ export function OwnerDashboard() {
               <tbody>
                 {sorted.map(c => (
                   <tr key={c.id}>
-                    {/* Spring Boot field names — customerName not name, phoneNumber not phone etc. */}
                     <td><strong>{c.customerName}</strong></td>
                     <td style={{ color: 'var(--gray-500)' }}>{c.phoneNumber}</td>
                     <td style={{ color: 'var(--gray-500)' }}>{c.licensePlate || '—'}</td>

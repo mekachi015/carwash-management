@@ -105,6 +105,7 @@ export async function getPaymentStatus(paymentToken){
  */
 export async function getTodayStats() {
   return apiFetch('/api/stats/today');
+  //return apiFetch('/api/stats/today');
 }
 
 /**
@@ -113,6 +114,7 @@ export async function getTodayStats() {
  */
 export async function getRevenueByDay(days = 7) {
   return apiFetch(`/api/stats/revenue?days=${days}`);
+  //return apiFetch(`/api/stats/revenue?days=${days}`);
 }
 
 export async function exportToCSV() {
